@@ -683,20 +683,14 @@ var dataTypes = {
     }
 };
 
-// the extend method used to extend prototypes, maintain inheritance chains for instanceof
-// and allow for additions to the model definitions.
-function extend(protoProps) {
-    var parent = this;
-    var child;
-    var args = [].slice.call(arguments);
-    var prop, item;
+// the inherits method used to maintain inheritance chains for prototypes and instanceof
+function inherits(child, parent) {
 
     // The constructor function for the new subclass is either defined by you
-    // (the "constructor" property in your `extend` definition), or defaulted
+    // (the first argument in your `inherits` call), or defaulted
     // by us to simply call the parent's constructor.
-    if (protoProps && protoProps.hasOwnProperty('constructor')) {
-        child = protoProps.constructor;
-    } else {
+    if (!parent) {
+        parent = child;
         child = function () {
             return parent.apply(this, arguments);
         };
@@ -719,47 +713,6 @@ function extend(protoProps) {
     child.prototype._children = _.extend({}, parent.prototype._children);
     child.prototype._dataTypes = _.extend({}, parent.prototype._dataTypes || dataTypes);
 
-    // Mix in all prototype properties to the subclass if supplied.
-    if (protoProps) {
-        args.forEach(function processArg(def) {
-            var omitFromExtend = [
-                'dataTypes', 'props', 'session', 'derived', 'collections', 'children'
-            ];
-            if (def.dataTypes) {
-                _.each(def.dataTypes, function (def, name) {
-                    child.prototype._dataTypes[name] = def;
-                });
-            }
-            if (def.props) {
-                _.each(def.props, function (def, name) {
-                    createPropertyDefinition(child.prototype, name, def);
-                });
-            }
-            if (def.session) {
-                _.each(def.session, function (def, name) {
-                    createPropertyDefinition(child.prototype, name, def, true);
-                });
-            }
-            if (def.derived) {
-                _.each(def.derived, function (def, name) {
-                    createDerivedProperty(child.prototype, name, def);
-                });
-            }
-            if (def.collections) {
-                _.each(def.collections, function (constructor, name) {
-                    child.prototype._collections[name] = constructor;
-                });
-            }
-            if (def.children) {
-                _.each(def.children, function (constructor, name) {
-                    child.prototype._children[name] = constructor;
-                });
-            }
-            _.extend(child.prototype, _.omit(def, omitFromExtend));
-        });
-    }
-
-    var toString = Object.prototype.toString;
 
     // Set a convenience property in case the parent's prototype is needed
     // later.
@@ -768,7 +721,86 @@ function extend(protoProps) {
     return child;
 }
 
-Base.extend = extend;
+// the extend method used to extend prototypes, 
+// and allow for additions to the model definitions.
+function extend(destProto, srcProto) {
+
+    var args = [].slice.call(arguments);
+    var prop, item;
+
+    // Mix in all prototype properties to the subclass if supplied.
+    if (srcProto) {
+        args.forEach(function processArg(def) {
+            var omitFromExtend = [
+                'dataTypes', 'props', 'session', 'derived', 'collections', 'children'
+            ];
+            if (def.dataTypes) {
+                _.each(def.dataTypes, function (def, name) {
+                    destProto._dataTypes[name] = def;
+                });
+            }
+            if (def.props) {
+                _.each(def.props, function (def, name) {
+                    createPropertyDefinition(destProto, name, def);
+                });
+            }
+            if (def.session) {
+                _.each(def.session, function (def, name) {
+                    createPropertyDefinition(destProto, name, def, true);
+                });
+            }
+            if (def.derived) {
+                _.each(def.derived, function (def, name) {
+                    createDerivedProperty(destProto, name, def);
+                });
+            }
+            if (def.collections) {
+                _.each(def.collections, function (constructor, name) {
+                    destProto._collections[name] = constructor;
+                });
+            }
+            if (def.children) {
+                _.each(def.children, function (constructor, name) {
+                    destProto._children[name] = constructor;
+                });
+            }
+            _.extend(destProto, _.omit(def, omitFromExtend));
+        });
+    }
+
+    var toString = Object.prototype.toString;
+
+    return destProto;
+}
+
+Base.inherits = inherits;
+
+Base.extend = function extendCompat () {
+
+    // Provide backwards compatibility with former api
+    if (this.extend) {
+        var protoProps = arguments[0];
+
+        var parent = this;
+        var child;
+
+        // The constructor function for the new subclass is either defined by you
+        // (the "constructor" property in your `extend` definition), or defaulted
+        // by us to simply inherit from the parent.
+        if (protoProps && protoProps.hasOwnProperty('constructor')) {
+            child = protoProps.constructor;
+            inherits(child, parent);
+        } else {
+            child = inherits(parent);
+        }
+        
+        extend(child.prototype, protoProps);
+
+        return child;
+    }
+
+    return extend.apply(this, arguments);
+};
 
 // Our main exports
 module.exports = Base;
