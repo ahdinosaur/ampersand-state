@@ -439,6 +439,9 @@ _.extend(Base.prototype, BBEvents, {
         var child;
         if (!this._children) return;
         for (child in this._children) {
+            if (this._hasParent(this)) {
+                break;
+            }
             this[child] = new this._children[child]({}, {parent: this});
             this.listenTo(this[child], 'all', this._getEventBubblingHandler(child));
         }
@@ -465,7 +468,19 @@ _.extend(Base.prototype, BBEvents, {
             }
         }
         return true;
-    }
+    },
+
+    // Check whether this has other as parent
+    _hasParent: function (other) {
+        var parent = this.parent;
+        while (parent) {
+            if (parent === other) {
+                return true;
+            }
+            parent = parent.parent;
+        }
+        return false;
+    },
 });
 
 // getter for attributes
